@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use App\Mail\OtpMail;
 
 class RegisteredUserController extends Controller
 {
@@ -46,6 +50,17 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        $otp = rand(100000, 999999);
+        Cache::put('otp_' . $user->email, $otp, now()->addMinutes(5));
+
+        try {
+            Mail::to($user->email)->send(new OtpMail($otp));
+        } catch (\Exception $e) {
+            Log::error('Gagal mengirim OTP email: ' . $e->getMessage());
+            // Tetap lanjut ke halaman verifikasi, user bisa resend nanti
+        }
+
+        // Arahkan ke halaman verifikasi OTP
+        return redirect()->route('otp.verify')->with('email', $user->email);
     }
 }
